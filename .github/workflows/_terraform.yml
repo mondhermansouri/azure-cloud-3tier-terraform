@@ -1,0 +1,140 @@
+# Workflow réutilisable (modulaire) : exécute un cycle Terraform pour UN
+# environnement. Appelé par les pipelines CI (plan) et CD (apply) ainsi que
+# par le workflow de destruction. Réalise les phases Build → Test → Deploy.
+
+name: terraform-reusable
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "Environnement cible (dev/test/prod)."
+        required: true
+        type: string
+      action:
+        description: "Action Terraform : plan | apply | destroy."
+        required: true
+        type: string
+      tf_version:
+        description: "Version de Terraform."
+        required: false
+        type: string
+        default: "1.9.8"
+    secrets:
+      ARM_CLIENT_ID:
+        required: true
+      ARM_CLIENT_SECRET:
+        required: true
+      ARM_TENANT_ID:
+        required: true
+      ARM_SUBSCRIPTION_ID:
+        required: true
+
+# Authentification Service Principal (le provider azurerm lit ces variables)
+env:
+  ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+  ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+
+jobs:
+  terraform:
+    name: "terraform-${{ inputs.action }} (${{ inputs.environment }})"
+    runs-on: ubuntu-latest
+    # Lie le job à l'Environment GitHub -> approbations / protections selon l'env
+    environment: ${{ inputs.environment }}
+    defaults:
+      run:
+        shell: bash
+    concurrency:
+      # Empêche deux applies concurrents sur le même état d'environnement
+      group: tfstate-${{ inputs.environment }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # --- BUILD : préparation et formatage --------------------------------
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.tf_version }}
+
+      - name: Terraform fmt (vérification)
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        run: terraform init -backend-config="environments/${{ inputs.environment }}/backend.tfvars"
+
+      - name: Terraform validate
+        run: terraform validate -no-color
+
+      # --- TEST : analyse statique de sécurité -----------------------------
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      - name: TFLint
+        run: |
+          tflint --init
+          tflint --recursive -f compact
+
+      - name: Trivy IaC scan (sécurité)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: "0" # n'échoue pas le pipeline ; remonte les findings
+          format: table
+
+      # --- DEPLOY (ou PLAN) ------------------------------------------------
+      - name: Terraform plan
+        id: plan
+        run: |
+          terraform plan -no-color \
+            -var-file="environments/${{ inputs.environment }}/terraform.tfvars" \
+            -out=tfplan-${{ inputs.environment }}
+        continue-on-error: ${{ inputs.action == 'plan' }}
+
+      - name: Upload plan artifact
+        if: ${{ inputs.action == 'plan' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ inputs.environment }}
+          path: tfplan-${{ inputs.environment }}
+          retention-days: 5
+
+      - name: Comment plan on PR
+        if: ${{ inputs.action == 'plan' && github.event_name == 'pull_request' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const env = "${{ inputs.environment }}";
+            const status = "${{ steps.plan.outcome }}";
+            const body = `### Terraform Plan – \`${env}\`\nRésultat : **${status}**\nVoir les logs du job pour le détail du plan.`;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
+
+      - name: Terraform apply
+        if: ${{ inputs.action == 'apply' }}
+        run: |
+          terraform apply -no-color -auto-approve \
+            -var-file="environments/${{ inputs.environment }}/terraform.tfvars"
+
+      - name: Terraform destroy
+        if: ${{ inputs.action == 'destroy' }}
+        run: |
+          terraform destroy -no-color -auto-approve \
+            -var-file="environments/${{ inputs.environment }}/terraform.tfvars"

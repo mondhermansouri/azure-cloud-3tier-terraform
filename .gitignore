@@ -1,0 +1,32 @@
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+.terraform.lock.hcl.bak
+tfplan-*
+*.tfplan
+
+# Ne PAS ignorer les tfvars d'environnement versionnés (config, pas secrets)
+!environments/**/*.tfvars
+
+# Secrets / local
+*.pem
+*.key
+.env
+.env.*
+local.tfvars
+
+# OS / éditeurs
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

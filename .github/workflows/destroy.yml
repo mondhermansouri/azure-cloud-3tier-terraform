@@ -1,0 +1,46 @@
+# Destruction manuelle d'un environnement (workflow_dispatch).
+# Garde-fou : nécessite de saisir le nom de l'environnement à détruire et,
+# pour prod, passe par l'approbation de l'Environment GitHub.
+
+name: Destroy - Terraform
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environnement à détruire"
+        required: true
+        type: choice
+        options: [dev, test, prod]
+      confirm:
+        description: "Tapez 'DETRUIRE' pour confirmer"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Vérification de la confirmation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Valider la saisie
+        run: |
+          if [ "${{ inputs.confirm }}" != "DETRUIRE" ]; then
+            echo "Confirmation invalide. Saisie attendue : DETRUIRE" >&2
+            exit 1
+          fi
+
+  destroy:
+    name: Destroy (${{ inputs.environment }})
+    needs: guard
+    uses: ./.github/workflows/_terraform.yml
+    with:
+      environment: ${{ inputs.environment }}
+      action: destroy
+    secrets:
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}

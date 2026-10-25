@@ -1,0 +1,80 @@
+# CI — déclenché sur Pull Request : valide, scanne et calcule le plan Terraform.
+# Correspond aux étapes Build + Test du schéma (avant tout déploiement).
+
+name: CI - Terraform Plan
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "**.tf"
+      - "environments/**"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  # TEST — tests natifs Terraform avec providers mockés (aucune credential Azure,
+  # aucune ressource créée). Gate les plans : si les tests échouent, pas de plan.
+  unit-tests:
+    name: Terraform tests (mocked)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - name: Terraform init (sans backend)
+        run: terraform init -backend=false
+
+      - name: Terraform test
+        run: terraform test -no-color
+
+  plan-dev:
+    name: Plan (dev)
+    needs: unit-tests
+    uses: ./.github/workflows/_terraform.yml
+    with:
+      environment: dev
+      action: plan
+    secrets:
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+  plan-test:
+    name: Plan (test)
+    needs: unit-tests
+    uses: ./.github/workflows/_terraform.yml
+    with:
+      environment: test
+      action: plan
+    secrets:
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+  plan-prod:
+    name: Plan (prod)
+    needs: unit-tests
+    uses: ./.github/workflows/_terraform.yml
+    with:
+      environment: prod
+      action: plan
+    secrets:
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}

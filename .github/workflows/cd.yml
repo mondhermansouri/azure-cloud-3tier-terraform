@@ -1,0 +1,57 @@
+# CD — déclenché au merge sur main : déploie en cascade Dev -> Test -> Prod.
+# Correspond à l'étape Deploy du schéma, avec promotion progressive.
+# Les approbations manuelles se configurent via les "Environments" GitHub
+# (Settings > Environments) : exiger des reviewers sur test et prod.
+
+name: CD - Terraform Apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**.tf"
+      - "environments/**"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-dev:
+    name: Deploy (dev)
+    uses: ./.github/workflows/_terraform.yml
+    with:
+      environment: dev
+      action: apply
+    secrets:
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+  deploy-test:
+    name: Deploy (test)
+    needs: deploy-dev
+    uses: ./.github/workflows/_terraform.yml
+    with:
+      environment: test
+      action: apply
+    secrets:
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
+  deploy-prod:
+    name: Deploy (prod)
+    needs: deploy-test
+    uses: ./.github/workflows/_terraform.yml
+    with:
+      environment: prod
+      action: apply
+    secrets:
+      ARM_CLIENT_ID: ${{ secrets.ARM_CLIENT_ID }}
+      ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
+      ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
