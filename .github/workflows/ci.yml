@@ -23,6 +23,20 @@ permissions:
   pull-requests: write
 
 jobs:
+  check-secrets:
+    name: Check Azure Secrets
+    runs-on: ubuntu-latest
+    outputs:
+      has-secrets: ${{ steps.check.outputs.has-secrets }}
+    steps:
+      - id: check
+        run: |
+          if [ -n "${{ secrets.ARM_CLIENT_ID }}" ]; then
+            echo "has-secrets=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-secrets=false" >> "$GITHUB_OUTPUT"
+          fi
+
   # TEST — tests natifs Terraform avec providers mockés (aucune credential Azure,
   # aucune ressource créée). Gate les plans : si les tests échouent, pas de plan.
   unit-tests:
@@ -48,8 +62,8 @@ jobs:
 
   plan-dev:
     name: Plan (dev)
-    needs: unit-tests
-    if: ${{ secrets.ARM_CLIENT_ID != '' }}
+    needs: [unit-tests, check-secrets]
+    if: needs.check-secrets.outputs.has-secrets == 'true'
     uses: ./.github/workflows/_terraform.yml
     with:
       environment: dev
@@ -62,8 +76,8 @@ jobs:
 
   plan-test:
     name: Plan (test)
-    needs: unit-tests
-    if: ${{ secrets.ARM_CLIENT_ID != '' }}
+    needs: [unit-tests, check-secrets]
+    if: needs.check-secrets.outputs.has-secrets == 'true'
     uses: ./.github/workflows/_terraform.yml
     with:
       environment: test
@@ -76,8 +90,8 @@ jobs:
 
   plan-prod:
     name: Plan (prod)
-    needs: unit-tests
-    if: ${{ secrets.ARM_CLIENT_ID != '' }}
+    needs: [unit-tests, check-secrets]
+    if: needs.check-secrets.outputs.has-secrets == 'true'
     uses: ./.github/workflows/_terraform.yml
     with:
       environment: prod
@@ -87,3 +101,4 @@ jobs:
       ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
       ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
