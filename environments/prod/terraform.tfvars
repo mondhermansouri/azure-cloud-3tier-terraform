@@ -36,7 +36,7 @@ enable_ddos_protection = true
 # Restreindre l'accès admin / CI aux plages connues
 allowed_ip_ranges = []
 
-alert_emails = ["secopsag01@evoxai.ca"]
+alert_emails = ["alerts@example.com"]
 
 tags = {
   cost_center = "production"

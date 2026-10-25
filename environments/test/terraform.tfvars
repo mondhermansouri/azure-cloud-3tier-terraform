@@ -33,7 +33,7 @@ enable_geo_replication = false
 frontdoor_sku          = "Standard_AzureFrontDoor"
 enable_ddos_protection = false
 
-alert_emails = ["secopsag01@evoxai.ca"]
+alert_emails = ["alerts@example.com"]
 
 tags = {
   cost_center = "qa"
