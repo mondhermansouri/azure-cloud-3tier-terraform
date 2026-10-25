@@ -1,10 +1,16 @@
-# CI — déclenché sur Pull Request : valide, scanne et calcule le plan Terraform.
-# Correspond aux étapes Build + Test du schéma (avant tout déploiement).
+# CI — déclenché sur Pull Request et push sur main : valide, scanne et teste Terraform.
+# Correspond aux étapes Build + Test du schéma (tests natifs Terraform mockés sans credentials).
 
-name: CI - Terraform Plan
+name: CI - Terraform Test & Plan
 
 on:
   pull_request:
+    branches: [main]
+    paths:
+      - "**.tf"
+      - "environments/**"
+      - ".github/workflows/**"
+  push:
     branches: [main]
     paths:
       - "**.tf"
