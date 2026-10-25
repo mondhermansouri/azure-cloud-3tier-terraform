@@ -49,6 +49,7 @@ jobs:
   plan-dev:
     name: Plan (dev)
     needs: unit-tests
+    if: ${{ secrets.ARM_CLIENT_ID != '' }}
     uses: ./.github/workflows/_terraform.yml
     with:
       environment: dev
@@ -62,6 +63,7 @@ jobs:
   plan-test:
     name: Plan (test)
     needs: unit-tests
+    if: ${{ secrets.ARM_CLIENT_ID != '' }}
     uses: ./.github/workflows/_terraform.yml
     with:
       environment: test
@@ -75,6 +77,7 @@ jobs:
   plan-prod:
     name: Plan (prod)
     needs: unit-tests
+    if: ${{ secrets.ARM_CLIENT_ID != '' }}
     uses: ./.github/workflows/_terraform.yml
     with:
       environment: prod

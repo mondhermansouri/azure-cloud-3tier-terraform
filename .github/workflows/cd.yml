@@ -20,6 +20,7 @@ permissions:
 jobs:
   deploy-dev:
     name: Deploy (dev)
+    if: ${{ secrets.ARM_CLIENT_ID != '' }}
     uses: ./.github/workflows/_terraform.yml
     with:
       environment: dev
@@ -33,6 +34,7 @@ jobs:
   deploy-test:
     name: Deploy (test)
     needs: deploy-dev
+    if: ${{ secrets.ARM_CLIENT_ID != '' }}
     uses: ./.github/workflows/_terraform.yml
     with:
       environment: test
@@ -46,6 +48,7 @@ jobs:
   deploy-prod:
     name: Deploy (prod)
     needs: deploy-test
+    if: ${{ secrets.ARM_CLIENT_ID != '' }}
     uses: ./.github/workflows/_terraform.yml
     with:
       environment: prod
@@ -55,3 +58,4 @@ jobs:
       ARM_CLIENT_SECRET: ${{ secrets.ARM_CLIENT_SECRET }}
       ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
       ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
